@@ -59,7 +59,7 @@ uploadArchives {
                 packaging 'jar'
                 artifactId archivesBaseName
                 description _description
-                url 'https://github.com/nodes-android/nstack-gradle'
+                url 'https://github.com/nodes-android/ci-bitrise-gradle-plugin'
                 inceptionYear '2017'
 
                 scm {
