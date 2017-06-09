@@ -28,8 +28,8 @@ productFlavors {
         hockeyAppIdStaging = "yourKeyShouldGoHere"
         deploy = "staging"
     }
-    secondSkin {
-        applicationId = "com.example.app.secondSkin"
+    thirdSkin {
+        applicationId = "com.example.app.thirdSkin"
         hockeyAppIdStaging = "yourKeyShouldGoHere"
         hockeyAppId = "yourKeyShouldGoHere"
     }
@@ -40,7 +40,30 @@ productFlavors {
 `hockeyAppIdStaging` Your Hockey App Staging ID    
 `deploy` Specify which build should be deployed (Optional)   
 
+## Example Output
 
+Once the plugin runs the output should look something like
 
-
-
+```
+[
+  {
+    "build": "app-first.apk",
+    "hockeyId": "yourKeyShouldGoHere",
+    "appId": "com.example.app.firstSkin",
+    "mappingFile": "null"
+  },
+  {
+    "build": "app-second.apk",
+    "hockeyId": "yourKeyShouldGoHere",
+    "appId": "com.example.app.secondSkin",
+    "mappingFile": "null"
+  },
+  {
+    "build": "app-third.apk",
+    "hockeyId": "yourKeyShouldGoHere",
+    "appId": "com.example.app.thirdSkin",
+    "mappingFile": "null"
+  }
+]
+```
+	  
