@@ -30,7 +30,7 @@ dependencies {
 
 
 task installArchives(type: Upload) {
-    description "Installs the artifacts to the local Maven repository."
+    description "Installs the artifacts to the local Maven repository"
     repositories.mavenInstaller {
         configuration = configurations.default
         pom.groupId = 'dk.nodes.ci'
