@@ -14,10 +14,31 @@ class PluginUtils {
         return false
     }
 
-    static String[] getDeploymentModes(Project project, ApplicationVariant variant) {
-        def defaultDeployMode = project.bitrise.defaultDeployMode
+    static boolean containsIgnoreCase(String haystack, String key) {
+        haystack = haystack.toLowerCase()
 
-        def deployMode = (variant.productFlavors[0].ext.has("deploy")) ? variant.productFlavors[0].ext.get("deploy") : defaultDeployMode
+        key = key.toLowerCase()
+
+        return haystack.contains(key)
+    }
+
+    static boolean arrayContainsString(List<String> haystack, String needle) {
+        needle = needle.toLowerCase()
+        for (String string : haystack) {
+            string = string.toLowerCase()
+            if (needle.contains(string)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    static String[] getDeploymentModes(Project project, ApplicationVariant variant) {
+        String defaultDeployMode = project.bitrise.defaultDeployMode
+
+        String deployMode = variant.productFlavors[0].ext.get("deploy")
+
+        deployMode = deployMode.length() == 0 ? defaultDeployMode : deployMode
 
         return deployMode.tokenize("|")
     }
