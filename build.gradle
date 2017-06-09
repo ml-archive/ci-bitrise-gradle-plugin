@@ -11,7 +11,6 @@ group 'dk.nodes.ci'
 version '1.0.0'
 
 apply plugin: 'groovy'
-apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
