@@ -1,3 +1,6 @@
+apply plugin: 'signing'
+apply plugin: 'maven'
+
 // Artifact settings
 group = 'dk.nodes.ci'
 version = '0.1'
