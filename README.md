@@ -36,9 +36,9 @@ productFlavors {
 }
 ```
  
-`hockeyAppId` Your Hockey App ID (Optional)
-`hockeyAppIdStaging` Your Hockey App Staging ID
-`deploy` Specify which build should be deployed (Optional)
+`hockeyAppId` Your Hockey App ID (Optional)   
+`hockeyAppIdStaging` Your Hockey App Staging ID   
+`deploy` Specify which build should be deployed (Optional)   
 
 
 
