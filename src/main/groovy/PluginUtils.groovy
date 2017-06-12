@@ -14,6 +14,18 @@ class PluginUtils {
         return false
     }
 
+    static boolean stringContainsArray(String haystack, String[] needle) {
+        haystack = haystack.toLowerCase()
+        for (String string : needle) {
+            string = string.toLowerCase()
+            if (haystack.contains(string)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     static boolean containsIgnoreCase(String haystack, String key) {
         haystack = haystack.toLowerCase()
 

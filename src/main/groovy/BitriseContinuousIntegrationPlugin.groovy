@@ -4,9 +4,12 @@ import com.android.build.gradle.api.ApplicationVariant
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import org.gradle.api.Action
+import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.TaskExecutionException
 import org.gradle.process.ExecSpec
 
 class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
@@ -60,6 +63,42 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                 task -> PluginUtils.arrayContainsString(taskNames, task.name)
             }
         } setGroup(GROUP_NAME)
+
+
+        project.task("ciDeployFilters") dependsOn {
+            List<String> taskNames = getFilteredFlavorTaskNames()
+
+            project.tasks.findAll {
+                task -> PluginUtils.arrayContainsString(taskNames, task.name)
+            }
+        } setGroup(GROUP_NAME)
+
+    }
+
+    List<String> getFilteredFlavorTaskNames() {
+        String flavorNames = project.bitrise.flavorFilter
+
+        List<String> taskNames = new ArrayList<>()
+
+        String[] filters = flavorNames.tokenize("|")
+
+        for (ApplicationVariant variant : project.android.applicationVariants) {
+            String variantName = PluginUtils.capFirstLetter(variant.name)
+
+            String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
+
+            boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
+
+            boolean isInFilter = PluginUtils.stringContainsArray(variant.name,filters)
+
+            String taskName = String.format(FORMAT_TASK_NAME, variantName)
+
+            if (shouldCreateTask && isInFilter) {
+                taskNames.add(taskName)
+            }
+        }
+
+        return taskNames
     }
 
 
@@ -151,10 +190,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         }
 
         //Generate the parent tasks
-
-        project.task("Debug") doLast {
-
-        }
 
         project.android.productFlavors.all { flavor ->
             String flavorName = PluginUtils.capFirstLetter(flavor.name)
