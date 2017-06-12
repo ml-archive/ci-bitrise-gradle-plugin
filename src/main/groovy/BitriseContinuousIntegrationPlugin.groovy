@@ -2,6 +2,7 @@ import com.android.build.gradle.AppPlugin
 import com.android.build.gradle.LibraryPlugin
 import com.android.build.gradle.api.ApplicationVariant
 import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -13,7 +14,8 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     public static final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
     public static final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
     public static final String GROUP_NAME = "ci"
-    public static final String WORKING_DIR = "../"
+    private static final String BUILD_DIR_ENV = "BITRISE_SOURCE_DIR"
+    private static String BUILD_DIR = ""
     private static JsonArray jsonArray = new JsonArray()
     //Format for our task names (%s being the name of the task)
     Project project
@@ -33,16 +35,25 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
             throw new IllegalStateException("CI GRADLE PLUGIN: 'android' or 'android-library' plugin required.")
         }
 
+        //Generate Build Dir
+
+        generateBuildDir()
+
+        //Create our Envman File
+
+        //initializeEnvman()
+
         // Add the extension object
 
         project.extensions.create("bitrise", BitriseExtension)
 
         //Go through each flavor and add extensions
 
-        project.android.productFlavors.all { flavor ->
-            flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_RELEASE, null)
-            flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_STAGING, null)
-            flavor.ext.set("deploy", "")
+        project.android.productFlavors.all {
+            flavor ->
+                flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_RELEASE, null)
+                flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_STAGING, null)
+                flavor.ext.set("deploy", "")
         }
 
         //Task to generate our tasks
@@ -58,164 +69,145 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
 
         project.task("ciDebug") doLast {
-            List<String> taskNames = PluginUtils.getTaskNames(project)
-
-            List<String> filteredTaskNames = PluginUtils.getFilteredTaskNames(project)
-
-            println taskNames
-
-            println filteredTaskNames
-
+            //Try to write our file to Envman
+            try {
+                project.exec {
+                    workingDir BUILD_DIR
+                    commandLine 'envman', 'print'
+                }
+            } catch (Exception exception) {
+                //println "Error unable to locate envman skipping step"
+                //If we get an exception here its most likely because we don't have envman installed
+            }
         } setGroup(GROUP_NAME)
 
     }
 
-    void initializeEnvman(){
+    void initializeEnvman() {
         try {
             project.exec {
-                workingDir WORKING_DIR
-
+                workingDir BUILD_DIR
                 commandLine 'envman', 'init'
             }
         } catch (Exception exception) {
-            //If we get an exception during this process the file most likely already exist so just ignore it
-            println "Error unable to locate envman skipping step"
         }
     }
 
+    List<Task> getTasks(boolean filtered) {
+        List<String> taskNames = filtered ? PluginUtils.getFilteredTaskNames(project) : PluginUtils.getTaskNames(project)
+        List<Task> tasks = new ArrayList<>()
+        for (String taskName : taskNames) {
+            Task task = project.tasks.findByName(taskName)
+            tasks.add(task)
+        }
+        return tasks
+    }
+
     void createDeployAllTask() {
-        project.task("ciDeployAll") dependsOn {
-            List<String> taskNames = PluginUtils.getTaskNames(project)
-
-            List<Task> tasks = new ArrayList<>()
-
-            for (String taskName: taskNames){
-                Task task = project.tasks.findByName(taskName)
-
-                tasks.add(task)
-            }
-
-            println "String task size: " + tasks.size()
-
-            return tasks
-
+        project.task("ciDeployAll") doLast {
+            jsonArray = new JsonArray()
+        } dependsOn {
+            return getTasks(false)
         } setGroup(GROUP_NAME)
     }
 
     void createDeployFiltersTask() {
-        project.task("ciDeployFilters") dependsOn {
-            List<String> taskNames = PluginUtils.getFilteredTaskNames(project)
-
-
-            List<Task> tasks = new ArrayList<>()
-
-            for (String taskName: taskNames){
-                Task task = project.tasks.findByName(taskName)
-
-                tasks.add(task)
-            }
-
-            println "String task size: " + tasks.size()
-
-            return tasks
-
-
+        project.task("ciDeployFilters") doLast {
+            jsonArray = new JsonArray()
+        } dependsOn {
+            return getTasks(true)
         } setGroup(GROUP_NAME)
     }
 
     void generateFlavorTasks() {
         //Generate the children tasks
 
-        project.android.applicationVariants.all { variant ->
+        project.android.applicationVariants.all {
+            variant ->
+                assert variant instanceof ApplicationVariant
 
-            assert variant instanceof ApplicationVariant
+                String variantName = PluginUtils.capFirstLetter(variant.name)
 
-            String variantName = PluginUtils.capFirstLetter(variant.name)
+                String tnAssemble = String.format(FORMAT_ASSEMBLE_TASK_NAME, variantName)
+                String tnValidate = String.format(FORMAT_VALIDATE_TASK_NAME, variantName)
+                String tnDeploy = String.format(FORMAT_DEPLOY_TASK_NAME, variantName)
+                String tnParent = String.format(FORMAT_TASK_NAME, variantName)
 
-            String tnAssemble = String.format(FORMAT_ASSEMBLE_TASK_NAME, variantName)
-            String tnValidate = String.format(FORMAT_VALIDATE_TASK_NAME, variantName)
-            String tnDeploy = String.format(FORMAT_DEPLOY_TASK_NAME, variantName)
-            String tnParent = String.format(FORMAT_TASK_NAME, variantName)
+                String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
 
-            String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
+                boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
 
-            boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
+                if (shouldCreateTask) {
+                    Task taskAssemble = project.tasks.findByName(tnAssemble)
 
-            if (shouldCreateTask) {
-                Task taskAssemble = project.tasks.findByName(tnAssemble)
+                    //Create our validation Task (use to make sure our hockey ID is present)
+                    Task taskValidate = project.task(tnValidate)
 
-                //Create our validation Task (use to make sure our hockey ID is present)
-                Task taskValidate = project.task(tnValidate)
+                    taskValidate.doLast {
+                        println()
+                        println "Validating Hockey ID"
+                        println()
+                        println "Validated Hockey ID: " + HockeyValidator.validate(variant)
+                        // < This function validates the ID
+                        println()
+                    }
 
-                taskValidate.doLast {
-                    println()
-                    println "Validating Hockey ID"
-                    println()
-                    println "Validated Hockey ID: " + HockeyValidator.validate(variant)
-                    // <-- This function validates the ID
-                    println()
+                    taskValidate.setGroup(GROUP_NAME)
+
+                    //Create our deployment task
+
+                    Task taskDeploy = project.task(tnDeploy)
+
+                    taskDeploy.doLast {
+                        singleDeploy(project, variant)
+                    }
+
+                    taskDeploy.setGroup(GROUP_NAME)
+
+                    //Setup task order
+
+                    taskAssemble.shouldRunAfter taskValidate
+                    taskDeploy.shouldRunAfter taskAssemble
+
+                    //Create our parent task (Will run all the tasks above)
+                    Task taskParent = project.task(tnParent)
+
+                    taskParent.doLast {
+                        println()
+                        println "Bitrise CI: " + variantName
+                        println()
+                    } dependsOn {
+                        List<Task> tasks = [taskValidate, taskAssemble, taskDeploy]
+                        return tasks.asCollection()
+                    }
+
+                    taskParent.setGroup(GROUP_NAME)
+
                 }
-
-                taskValidate.setGroup(GROUP_NAME)
-
-                //Create our deployment task
-
-                Task taskDeploy = project.task(tnDeploy)
-
-                taskDeploy.doLast {
-                    singleDeploy(project, variant)
-                }
-
-                taskDeploy.setGroup(GROUP_NAME)
-
-                //Setup task order
-
-                taskAssemble.shouldRunAfter taskValidate
-
-                taskDeploy.shouldRunAfter taskAssemble
-
-                //Create our parent task (Will run all the tasks above)
-                Task taskParent = project.task(tnParent)
-
-                taskParent.doLast {
-                    println()
-                    println "Bitrise CI: " + variantName
-                    println()
-                } dependsOn {
-                    List<Task> tasks = [taskValidate, taskAssemble, taskDeploy]
-                    return tasks.asCollection()
-                }
-
-                taskParent.setGroup(GROUP_NAME)
-
-            }
         }
 
         //Generate the parent tasks
 
-        project.android.productFlavors.all { flavor ->
-            String flavorName = PluginUtils.capFirstLetter(flavor.name)
+        project.android.productFlavors.all {
+            flavor ->
+                String flavorName = PluginUtils.capFirstLetter(flavor.name)
+                String taskName = String.format(FORMAT_TASK_NAME, flavorName)
+                Task taskParent = project.task(taskName)
 
-            String taskName = String.format(FORMAT_TASK_NAME, flavorName)
-
-            Task taskParent = project.task(taskName)
-
-            taskParent.dependsOn {
-                //The following tasks should run before this task
-                project.tasks.findAll {
-                    task ->
-                        if (task.name.contains(GROUP_NAME) &&
-                                task.name.contains(flavorName) &&
-                                !task.name.equalsIgnoreCase(taskName)) {
-
-                            println task.name
-
-                            return task
-                        }
+                taskParent.dependsOn {
+                    //The following tasks should run before this task
+                    project.tasks.findAll {
+                        task ->
+                            if (task.name.contains(GROUP_NAME) &&
+                                    task.name.contains(flavorName) &&
+                                    !task.name.equalsIgnoreCase(taskName)) {
+                                println task.name
+                                return task
+                            }
+                    }
                 }
-            }
 
-            taskParent.setGroup(GROUP_NAME)
+                taskParent.setGroup(GROUP_NAME)
         }
     }
 
@@ -238,17 +230,18 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         //Pull whatever value we need
         hockeyId = HockeyValidator.validate(variant)
 
-        variant.outputs.each { output ->
-            apk = output.outputFile
+        variant.outputs.each {
+            output ->
+                apk = output.outputFile
         }
 
         println()
-        println('--------------------------------------------------')
+        println('')
         println('apk: ' + apk)
         println('hockeyId: ' + hockeyId)
         println('appId: ' + appId)
         println('mappingFile: ' + mappingFile)
-        println('--------------------------------------------------')
+        println('')
         println()
 
         //This is a comment
@@ -263,29 +256,42 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         jsonArray.add(jsonObject)
 
-
-        //Create our envman file
-
-        initializeEnvman()
-
+        saveFile(jsonArray)
         //Try to write our file to Envman
         try {
             project.exec {
-                workingDir WORKING_DIR
-
+                workingDir BUILD_DIR
                 commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
-
-                commandLine 'envman', 'print'
-
-                println jsonArray
-
                 println "Wrote json to ENV VAR"
             }
         } catch (Exception exception) {
             println "Error unable to locate envman skipping step"
-            //If we get an exception here its most likely because we don't have envman installed
         }
-
         return jsonObject
+    }
+
+    void generateBuildDir() {
+        String projectPath = System.getenv(BUILD_DIR_ENV)
+        if (projectPath == null || projectPath.isEmpty()) {
+            projectPath = project.rootDir.toString()
+        }
+        if (projectPath == null || projectPath.isEmpty()) {
+            File bitriseSrc = new File("/bitrise/src/")
+            if (bitriseSrc.exists()) {
+                projectPath = bitriseSrc.toString()
+            }
+        }
+        BUILD_DIR = projectPath
+    }
+
+    void saveFile(JsonElement jsonElement) {
+        String fileName = "hockeybuilds.json"
+
+        def hockeyFilePath = new File(BUILD_DIR, fileName).toString()
+
+        def stringsFile = new File(hockeyFilePath)
+
+        stringsFile.text = jsonElement
+
     }
 }
