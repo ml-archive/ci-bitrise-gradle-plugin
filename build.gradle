@@ -7,13 +7,18 @@ buildscript {
     }
 }
 
-group 'dk.nodes.ci'
-version '1.0.0'
+
 
 apply plugin: 'groovy'
 apply plugin: 'maven'
 apply plugin: 'maven-publish'
+
+group = 'dk.nodes.ci'
+version = '0.2'
+archivesBaseName = 'bitrise'
+
 apply from: 'maven-push.gradle'
+
 
 
 sourceCompatibility = 1.8
