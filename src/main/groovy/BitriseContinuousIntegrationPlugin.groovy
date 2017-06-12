@@ -2,20 +2,18 @@ import com.android.build.gradle.AppPlugin
 import com.android.build.gradle.LibraryPlugin
 import com.android.build.gradle.api.ApplicationVariant
 import com.google.gson.JsonArray
-import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import org.gradle.api.Action
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
-import org.gradle.process.ExecSpec
 
 class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
-    private final String FORMAT_TASK_NAME = "ci%s" //Format for our task names (%s being the name of the task)
-    private final String FORMAT_VALIDATE_TASK_NAME = "ci%sValidate"
-    private final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
-    private final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
-    private static String GROUP_NAME = "ci"
+    public static final String FORMAT_TASK_NAME = "ci%s" //Format for our task names (%s being the name of the task)
+    public static final String FORMAT_VALIDATE_TASK_NAME = "ci%sValidate"
+    public static final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
+    public static final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
+    public static final String GROUP_NAME = "ci"
+    public static final String WORKING_DIR = "../"
     private static JsonArray jsonArray = new JsonArray()
     //Format for our task names (%s being the name of the task)
     Project project
@@ -39,20 +37,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         project.extensions.create("bitrise", BitriseExtension)
 
-        //Initialize our Envman File
-
-        try {
-            project.exec(new Action<ExecSpec>() {
-                @Override
-                void execute(ExecSpec execSpec) {
-                    execSpec.workingDir '../build'
-                    execSpec.commandLine 'envman', 'init'
-                }
-            })
-        } catch (Exception exception) {
-            //If we get an exception during this process the file most likely already exist so just ignore it
-        }
-
         //Go through each flavor and add extensions
 
         project.android.productFlavors.all { flavor ->
@@ -64,78 +48,82 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         //Task to generate our tasks
 
         project.task("generateCITasks") {
-            generateFlavorTasks(project)
+            generateFlavorTasks()
         } setGroup(GROUP_NAME)
 
         //Create our task to run all commands
+        createDeployAllTask()
+        //Create our task to deploy only selected flavors
+        createDeployFiltersTask()
 
+
+        project.task("ciDebug") doLast {
+            List<String> taskNames = PluginUtils.getTaskNames(project)
+
+            List<String> filteredTaskNames = PluginUtils.getFilteredTaskNames(project)
+
+            println taskNames
+
+            println filteredTaskNames
+
+        } setGroup(GROUP_NAME)
+
+    }
+
+    void initializeEnvman(){
+        try {
+            project.exec {
+                workingDir WORKING_DIR
+
+                commandLine 'envman', 'init'
+            }
+        } catch (Exception exception) {
+            //If we get an exception during this process the file most likely already exist so just ignore it
+            println "Error unable to locate envman skipping step"
+        }
+    }
+
+    void createDeployAllTask() {
         project.task("ciDeployAll") dependsOn {
-            List<String> taskNames = getTaskNames()
+            List<String> taskNames = PluginUtils.getTaskNames(project)
 
-            project.tasks.findAll {
-                task -> PluginUtils.arrayContainsString(taskNames, task.name)
+            List<Task> tasks = new ArrayList<>()
+
+            for (String taskName: taskNames){
+                Task task = project.tasks.findByName(taskName)
+
+                tasks.add(task)
             }
+
+            println "String task size: " + tasks.size()
+
+            return tasks
+
         } setGroup(GROUP_NAME)
+    }
 
-
+    void createDeployFiltersTask() {
         project.task("ciDeployFilters") dependsOn {
-            List<String> taskNames = getFilteredFlavorTaskNames()
+            List<String> taskNames = PluginUtils.getFilteredTaskNames(project)
 
-            project.tasks.findAll {
-                task -> PluginUtils.arrayContainsString(taskNames, task.name)
+
+            List<Task> tasks = new ArrayList<>()
+
+            for (String taskName: taskNames){
+                Task task = project.tasks.findByName(taskName)
+
+                tasks.add(task)
             }
+
+            println "String task size: " + tasks.size()
+
+            return tasks
+
+
         } setGroup(GROUP_NAME)
-
     }
 
-    List<String> getFilteredFlavorTaskNames() {
-        String flavorNames = project.bitrise.flavorFilter
-
-        List<String> taskNames = new ArrayList<>()
-
-        String[] filters = flavorNames.tokenize("|")
-
-        for (ApplicationVariant variant : project.android.applicationVariants) {
-            String variantName = PluginUtils.capFirstLetter(variant.name)
-
-            String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
-
-            boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
-
-            boolean isInFilter = PluginUtils.stringContainsArray(variant.name, filters)
-
-            String taskName = String.format(FORMAT_TASK_NAME, variantName)
-
-            if (shouldCreateTask && isInFilter) {
-                taskNames.add(taskName)
-            }
-        }
-
-        return taskNames
-    }
-
-
-    List<String> getTaskNames() {
-        List<String> taskNames = new ArrayList<>()
-
-        for (ApplicationVariant variant : project.android.applicationVariants) {
-            String variantName = PluginUtils.capFirstLetter(variant.name)
-
-            String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
-
-            boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
-
-            String taskName = String.format(FORMAT_TASK_NAME, variantName)
-
-            if (shouldCreateTask) {
-                taskNames.add(taskName)
-            }
-        }
-
-        return taskNames
-    }
-
-    void generateFlavorTasks(Project project) {
+    void generateFlavorTasks() {
         //Generate the children tasks
 
         project.android.applicationVariants.all { variant ->
@@ -164,6 +152,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                     println "Validating Hockey ID"
                     println()
                     println "Validated Hockey ID: " + HockeyValidator.validate(variant)
+                    // <-- This function validates the ID
                     println()
                 }
 
@@ -230,23 +219,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         }
     }
 
-    void saveFile(JsonElement jsonElement) {
-        String fileName = "HockeyBuild.json"
-
-        def projectPath = project.buildDir.toString();
-
-        def hockeyFilePath = new File(projectPath, fileName).toString()
-
-        def stringsFile = new File(hockeyFilePath)
-
-        println "HockeySDK JSON output file:"
-
-        println jsonElement
-
-        stringsFile.text = jsonElement
-    }
-
-
     JsonObject singleDeploy(Project project, ApplicationVariant variant) {
         String apk = null
         String hockeyId
@@ -256,7 +228,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
 
         boolean shouldDeploy = PluginUtils.arrayContainsString(deploymentModes, variant.name)
-        String deployMode = PluginUtils.searchArray(deploymentModes,variant.name)
+        String deployMode = PluginUtils.searchArray(deploymentModes, variant.name)
 
         //If we aren't deploying then just abort
         if (!shouldDeploy) {
@@ -291,17 +263,26 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         jsonArray.add(jsonObject)
 
+
+        //Create our envman file
+
+        initializeEnvman()
+
         //Try to write our file to Envman
         try {
-            project.exec(new Action<ExecSpec>() {
-                @Override
-                void execute(ExecSpec execSpec) {
-                    execSpec.workingDir '../build'
-                    execSpec.commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
-                    println "Wrote json to ENV VAR"
-                }
-            })
+            project.exec {
+                workingDir WORKING_DIR
+
+                commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
+
+                commandLine 'envman', 'print'
+
+                println jsonArray
+
+                println "Wrote json to ENV VAR"
+            }
         } catch (Exception exception) {
+            println "Error unable to locate envman skipping step"
             //If we get an exception here its most likely because we don't have envman installed
         }
 

@@ -2,6 +2,61 @@ import com.android.build.gradle.api.ApplicationVariant
 import org.gradle.api.Project
 
 class PluginUtils {
+
+    static List<String> getTaskNames(Project project) {
+        List<String> taskNames = new ArrayList<>()
+
+        for (ApplicationVariant variant : project.android.applicationVariants) {
+            String variantName = capFirstLetter(variant.name)
+
+            String[] deploymentModes = getDeploymentModes(project, variant)
+
+            boolean shouldCreateTask = arrayContainsString(deploymentModes, variant.name)
+
+            String taskName = String.format(BitriseContinuousIntegrationPlugin.FORMAT_TASK_NAME, variantName)
+
+            if (shouldCreateTask) {
+                taskNames.add(taskName)
+            }
+        }
+
+        return taskNames
+    }
+
+    static List<String> getFilteredTaskNames(Project project){
+        List<String> taskNames = new ArrayList<>()
+
+        List<String> filterNames = getFilterNames(project)
+
+        for (ApplicationVariant variant : project.android.applicationVariants) {
+            String variantName = capFirstLetter(variant.name)
+
+            String[] deploymentModes = getDeploymentModes(project, variant)
+
+            boolean shouldCreateTask = arrayContainsString(deploymentModes, variant.name)
+
+            //If our filter list size is 0 then we should always return true because that means no filters :)
+
+            boolean isInFilter = stringContainsList(variant.name, filterNames) || filterNames.size() == 0
+
+            String taskName = String.format(BitriseContinuousIntegrationPlugin.FORMAT_TASK_NAME, variantName)
+
+            if (shouldCreateTask && isInFilter) {
+                taskNames.add(taskName)
+            }
+        }
+
+        return taskNames
+    }
+
+    static List<String> getFilterNames(Project project){
+        String flavorNames = project.bitrise.flavorFilter
+
+        String[] filters = flavorNames.tokenize("|")
+
+        return Arrays.asList(filters)
+    }
+
     static boolean arrayContainsString(String[] haystack, String needle) {
         needle = needle.toLowerCase()
         for (String string : haystack) {
@@ -26,7 +81,7 @@ class PluginUtils {
         return ""
     }
 
-    static boolean stringContainsArray(String haystack, String[] needle) {
+    static boolean stringContainsList(String haystack, List<String> needle) {
         haystack = haystack.toLowerCase()
         for (String string : needle) {
             string = string.toLowerCase()
@@ -51,6 +106,16 @@ class PluginUtils {
         for (String string : haystack) {
             string = string.toLowerCase()
             if (needle.contains(string)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    static boolean arrayContainsExactString(List<String> haystack, String needle) {
+        needle = needle.toLowerCase()
+        for (String hay : haystack) {
+            if (hay.equalsIgnoreCase(needle)) {
                 return true
             }
         }
