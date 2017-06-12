@@ -14,6 +14,18 @@ class PluginUtils {
         return false
     }
 
+    static String searchArray(String[] haystack, String needle) {
+        needle = needle.toLowerCase()
+        for (String string : haystack) {
+            string = string.toLowerCase()
+            if (needle.contains(string)) {
+                return string
+            }
+        }
+
+        return ""
+    }
+
     static boolean stringContainsArray(String haystack, String[] needle) {
         haystack = haystack.toLowerCase()
         for (String string : needle) {

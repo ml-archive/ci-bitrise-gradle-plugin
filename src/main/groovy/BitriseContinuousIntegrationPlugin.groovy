@@ -1,15 +1,13 @@
 import com.android.build.gradle.AppPlugin
 import com.android.build.gradle.LibraryPlugin
 import com.android.build.gradle.api.ApplicationVariant
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import org.gradle.api.Action
-import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
-import org.gradle.api.tasks.Exec
-import org.gradle.api.tasks.TaskExecutionException
 import org.gradle.process.ExecSpec
 
 class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
@@ -18,6 +16,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     private final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
     private final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
     private static String GROUP_NAME = "ci"
+    private static JsonArray jsonArray = new JsonArray()
     //Format for our task names (%s being the name of the task)
     Project project
 
@@ -40,6 +39,20 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         project.extensions.create("bitrise", BitriseExtension)
 
+        //Initialize our Envman File
+
+        try {
+            project.exec(new Action<ExecSpec>() {
+                @Override
+                void execute(ExecSpec execSpec) {
+                    execSpec.workingDir '../build'
+                    execSpec.commandLine 'envman', 'init'
+                }
+            })
+        } catch (Exception exception) {
+            //If we get an exception during this process the file most likely already exist so just ignore it
+        }
+
         //Go through each flavor and add extensions
 
         project.android.productFlavors.all { flavor ->
@@ -56,7 +69,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         //Create our task to run all commands
 
-        project.task("!ciDeployAll") dependsOn {
+        project.task("ciDeployAll") dependsOn {
             List<String> taskNames = getTaskNames()
 
             project.tasks.findAll {
@@ -89,7 +102,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
             boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
 
-            boolean isInFilter = PluginUtils.stringContainsArray(variant.name,filters)
+            boolean isInFilter = PluginUtils.stringContainsArray(variant.name, filters)
 
             String taskName = String.format(FORMAT_TASK_NAME, variantName)
 
@@ -217,8 +230,8 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         }
     }
 
-    void saveFile(String fileName, JsonElement jsonElement) {
-        fileName = String.format("%sHockeyBuild.json", fileName);
+    void saveFile(JsonElement jsonElement) {
+        String fileName = "HockeyBuild.json"
 
         def projectPath = project.buildDir.toString();
 
@@ -243,6 +256,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
 
         boolean shouldDeploy = PluginUtils.arrayContainsString(deploymentModes, variant.name)
+        String deployMode = PluginUtils.searchArray(deploymentModes,variant.name)
 
         //If we aren't deploying then just abort
         if (!shouldDeploy) {
@@ -273,16 +287,23 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         jsonObject.addProperty("hockeyId", hockeyId)
         jsonObject.addProperty("appId", appId)
         jsonObject.addProperty("mappingFile", mappingFile.toString())
-        jsonObject.addProperty("deploy", Arrays.toString(deploymentModes))
+        jsonObject.addProperty("deploy", deployMode)
 
-        project.exec(new Action<ExecSpec>() {
-            @Override
-            void execute(ExecSpec execSpec) {
-                execSpec.commandLine 'envman', 'init'
-                execSpec.commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonObject.toString()
-                println "Wrote json to ENV VAR"
-            }
-        })
+        jsonArray.add(jsonObject)
+
+        //Try to write our file to Envman
+        try {
+            project.exec(new Action<ExecSpec>() {
+                @Override
+                void execute(ExecSpec execSpec) {
+                    execSpec.workingDir '../build'
+                    execSpec.commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
+                    println "Wrote json to ENV VAR"
+                }
+            })
+        } catch (Exception exception) {
+            //If we get an exception here its most likely because we don't have envman installed
+        }
 
         return jsonObject
     }
