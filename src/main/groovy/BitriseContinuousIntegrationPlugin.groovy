@@ -265,6 +265,8 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         println('--------------------------------------------------')
         println()
 
+        //This is a comment
+
         JsonObject jsonObject = new JsonObject()
 
         jsonObject.addProperty("build", apk)
