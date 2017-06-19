@@ -14,7 +14,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 group = 'dk.nodes.ci'
-version = '0.5'
+version = '0.6'
 archivesBaseName = 'bitrise'
 
 apply from: 'maven-push.gradle'
@@ -42,7 +42,7 @@ task installArchives(type: Upload) {
         configuration = configurations.default
         pom.groupId = 'dk.nodes.ci'
         pom.artifactId = 'bitrise'
-        pom.version = '1.0.0'
+        pom.version = '1.0.0-test'
         pom.packaging = 'jar'
     }
 }
