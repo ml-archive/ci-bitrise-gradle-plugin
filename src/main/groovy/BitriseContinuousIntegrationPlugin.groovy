@@ -59,7 +59,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         createDeployFiltersTask()
 
 
-        if (this.project.envManEnabled) {
+        if (this.project.bitrise.envManEnabled) {
             project.task("ciDebug") doLast {
                 //Try to write our file to Envman
                 try {
@@ -248,7 +248,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         saveFile(jsonArray)
         //Try to write our file to Envman
-        if(this.project.envManEnabled) {
+        if(this.project.bitrise.envManEnabled) {
             try {
                 project.exec {
                     workingDir BUILD_DIR
