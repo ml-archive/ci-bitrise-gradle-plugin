@@ -14,7 +14,7 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 
 group = 'dk.nodes.ci'
-version = '0.6'
+version = '0.7'
 archivesBaseName = 'bitrise'
 
 apply from: 'maven-push.gradle'

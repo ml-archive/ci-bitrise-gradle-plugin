@@ -27,9 +27,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         this.project = project
 
         // Check if our project has the plugins we need
-
         def hasApp = project.plugins.withType(AppPlugin)
-
         def hasLib = project.plugins.withType(LibraryPlugin)
 
         if (!hasApp && !hasLib) {
@@ -37,19 +35,12 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         }
 
         //Generate Build Dir
-
         generateBuildDir()
 
-        //Create our Envman File
-
-        //initializeEnvman()
-
         // Add the extension object
-
         project.extensions.create("bitrise", BitriseExtension)
 
         //Go through each flavor and add extensions
-
         project.android.productFlavors.all {
             flavor ->
                 flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_RELEASE, null)
@@ -58,7 +49,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         }
 
         //Task to generate our tasks
-
         project.task("generateCITasks") {
             generateFlavorTasks()
         } setGroup(GROUP_NAME)
@@ -69,19 +59,20 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         createDeployFiltersTask()
 
 
-        project.task("ciDebug") doLast {
-            //Try to write our file to Envman
-            try {
-                project.exec {
-                    workingDir BUILD_DIR
-                    commandLine 'envman', 'print'
+        if (this.project.envManEnabled) {
+            project.task("ciDebug") doLast {
+                //Try to write our file to Envman
+                try {
+                    project.exec {
+                        workingDir BUILD_DIR
+                        commandLine 'envman', 'print'
+                    }
+                } catch (Exception exception) {
+                    //println "Error unable to locate envman skipping step"
+                    //If we get an exception here its most likely because we don't have envman installed
                 }
-            } catch (Exception exception) {
-                //println "Error unable to locate envman skipping step"
-                //If we get an exception here its most likely because we don't have envman installed
-            }
-        } setGroup(GROUP_NAME)
-
+            } setGroup(GROUP_NAME)
+        }
     }
 
     void initializeEnvman() {
@@ -245,8 +236,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         println('')
         println()
 
-        //This is a comment
-
         JsonObject jsonObject = new JsonObject()
 
         jsonObject.addProperty("build", apk)
@@ -259,14 +248,16 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         saveFile(jsonArray)
         //Try to write our file to Envman
-        try {
-            project.exec {
-                workingDir BUILD_DIR
-                commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
-                println "Wrote json to ENV VAR"
+        if(this.project.envManEnabled) {
+            try {
+                project.exec {
+                    workingDir BUILD_DIR
+                    commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
+                    println "Wrote json to ENV VAR"
+                }
+            } catch (Exception exception) {
+                println "Error unable to locate envman skipping step"
             }
-        } catch (Exception exception) {
-            println "Error unable to locate envman skipping step"
         }
         return jsonObject
     }
