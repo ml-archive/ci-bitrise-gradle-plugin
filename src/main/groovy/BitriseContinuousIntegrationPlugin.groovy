@@ -4,6 +4,7 @@ import com.android.build.gradle.api.ApplicationVariant
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -284,14 +285,24 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         BUILD_DIR = projectPath
     }
 
-    void saveFile(JsonElement jsonElement) {
+    void saveFile(JsonArray array) {
         String fileName = "hockeybuilds.json"
-
         def hockeyFilePath = new File(BUILD_DIR, fileName).toString()
-
+        println "hockeyFilePath: " + hockeyFilePath
         def stringsFile = new File(hockeyFilePath)
 
-        stringsFile.text = jsonElement
+        if (!stringsFile.exists()) stringsFile.createNewFile()
 
+        if (!stringsFile.text.isEmpty()) {
+            println "saveFile() - content already exists, appending to --> " + stringsFile.text
+            JsonParser parser = new JsonParser();
+            JsonElement tradeElement = parser.parse(stringsFile.text);
+            JsonArray alreadyCreatedBuildsJSON = tradeElement.getAsJsonArray();
+
+            alreadyCreatedBuildsJSON.addAll(array)
+            stringsFile.text = alreadyCreatedBuildsJSON
+        } else {
+            stringsFile.text = array
+        }
     }
 }
