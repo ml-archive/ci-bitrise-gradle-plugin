@@ -15,14 +15,14 @@ apply plugin: 'maven'
 apply plugin: 'maven-publish'
 apply plugin: 'io.codearte.nexus-staging'
 
-_group = 'dk.nodes.ci'
-_version = '0.8'
-_archivesBaseName = 'bitrise'
+group = 'dk.nodes.ci'
+version = '0.8'
+archivesBaseName = 'bitrise'
 
 apply from: 'maven-push.gradle'
 
 nexusStaging {
-    packageGroup = "$_group.$_archivesBaseName"
+    packageGroup = "$group.$archivesBaseName"
 }
 
 sourceCompatibility = 1.8
