@@ -22,7 +22,7 @@ archivesBaseName = 'bitrise'
 apply from: 'maven-push.gradle'
 
 nexusStaging {
-    packageGroup = "$group"
+    packageGroup = "dk.nodes"
 }
 
 sourceCompatibility = 1.8
