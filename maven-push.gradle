@@ -6,9 +6,12 @@ def _name = 'Nodes CI gradle plugin for Bitrise'
 def _description = 'Nodes CI gradle plugin for Bitrise'
 
 // Username & password for Sonatype, stored in gradle.properties
-def _ossrhUsername = this.properties['NEXUS_USERNAME']
-def _ossrhPassword = this.properties['NEXUS_PASSWORD']
+def _ossrhUsername = System.getenv('NEXUS_USERNAME')
+def _ossrhPassword = System.getenv('NEXUS_PASSWORD')
 
+allprojects { ext."signing.keyId" = System.getenv('keyId') }
+allprojects { ext."signing.secretKeyRingFile" = System.getenv('secretKeyRingFile') }
+allprojects { ext."signing.password" = System.getenv('password') }
 
 signing {
     required { gradle.taskGraph.hasTask("uploadArchives") }
