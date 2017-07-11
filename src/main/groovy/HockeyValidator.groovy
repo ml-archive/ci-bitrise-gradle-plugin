@@ -16,7 +16,7 @@ class HockeyValidator {
         boolean isRelease = PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_RELEASE)
 
         if (isStaging) {
-            hockeyId = variant.productFlavors[0].ext.get(HOCKEY_ID_TYPE_STAGING)
+            hockeyId = variant.productFlavors[0].ext.get(HOCKEY_ID_TYPE_STAGING) ?: variant.productFlavors[0].ext.get(HOCKEY_ID_TYPE_RELEASE)
             checkHockeyID(hockeyId, HOCKEY_ID_TYPE_STAGING)
         }
 
@@ -33,7 +33,7 @@ class HockeyValidator {
     }
 
     private static void checkHockeyID(String hockeyID, String HockeyIDType) {
-        if (hockeyID.length() == 0) {
+        if (hockeyID == null || hockeyID.length() == 0) {
             throw new GradleException("Missing Hockey ID Provided for field " + HockeyIDType)
         } else if (hockeyID.length() != HOCKEY_ID_LENGTH) {
             throw new GradleException("Invalid Hockey ID Provided for field " + HockeyIDType)
