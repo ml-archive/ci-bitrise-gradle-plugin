@@ -8,7 +8,8 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 
 class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
-    public static final String FORMAT_TASK_NAME = "ci%s" //Format for our task names (%s being the name of the task)
+    public static final String FORMAT_TASK_NAME = "ci%s"
+    //Format for our task names (%s being the name of the task)
     public static final String FORMAT_VALIDATE_TASK_NAME = "ci%sValidate"
     public static final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
     public static final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
@@ -41,8 +42,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         //Go through each flavor and add extensions
         project.android.productFlavors.all {
             flavor ->
-                flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_RELEASE, null)
-                flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_STAGING, null)
+                flavor.ext.set("hockeyAppId", [:])
                 flavor.ext.set("deploy", "")
         }
 
@@ -70,6 +70,12 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                     //If we get an exception here its most likely because we don't have envman installed
                 }
             } setGroup(GROUP_NAME)
+        }
+
+        project.afterEvaluate {
+            project.android.applicationVariants.all { variant ->
+                generateHockey(variant);
+            }
         }
     }
 
@@ -246,7 +252,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         saveFile(jsonArray)
         //Try to write our file to Envman
-        if(this.project.bitrise.envManEnabled) {
+        if (this.project.bitrise.envManEnabled) {
             try {
                 project.exec {
                     workingDir BUILD_DIR
@@ -283,5 +289,34 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         if (!stringsFile.exists()) stringsFile.createNewFile()
 
         stringsFile.text = array
+    }
+
+
+    void generateHockey(ApplicationVariant variant) {
+        //HockeyApp Injection
+        if (variant.productFlavors.size() > 1) {
+            //apps with dimensions like riide
+            if (variant.productFlavors[0].ext.hockeyAppId instanceof Map && variant.productFlavors[0].ext.hockeyAppId[variant.productFlavors[1].name] != null) {
+                //When environment keys specified
+                variant.buildConfigField "String", "HOCKEYAPP_ID", "\"" + variant.productFlavors[0].ext.hockeyAppId[variant.productFlavors[1].name] + "\"";
+                variant.resValue "string", "hockeyapp_id", variant.productFlavors[0].ext.hockeyAppId[variant.productFlavors[1].name]
+            } else if (variant.productFlavors[1].ext.hockeyAppId instanceof Map && variant.productFlavors[1].ext.hockeyAppId[variant.productFlavors[0].name] != null) {
+                //When environment keys specified
+                variant.buildConfigField "String", "HOCKEYAPP_ID", "\"" + variant.productFlavors[1].ext.hockeyAppId[variant.productFlavors[0].name] + "\"";
+                variant.resValue "string", "hockeyapp_id", variant.productFlavors[1].ext.hockeyAppId[variant.productFlavors[0].name]
+            } else if (variant.productFlavors[0].ext.hockeyAppId instanceof String) {
+                //When only an unique key has been specified
+                variant.buildConfigField "String", "HOCKEYAPP_ID", "\"" + variant.productFlavors[0].ext.hockeyAppId + "\"";
+                variant.resValue "string", "hockeyapp_id", variant.productFlavors[0].ext.hockeyAppId
+            } else if (variant.productFlavors[1].ext.hockeyAppId instanceof String) {
+                //When only an unique key has been specified
+                variant.buildConfigField "String", "HOCKEYAPP_ID", "\"" + variant.productFlavors[1].ext.hockeyAppId + "\"";
+                variant.resValue "string", "hockeyapp_id", variant.productFlavors[1].ext.hockeyAppId
+            }
+        } else if (variant.productFlavors[0].ext.hockeyAppId instanceof String) {
+            //normal apps
+            variant.buildConfigField "String", "HOCKEYAPP_ID", "\"" + variant.productFlavors[0].ext.hockeyAppId + "\"";
+            variant.resValue "string", "hockeyapp_id", variant.productFlavors[0].ext.hockeyAppId
+        }
     }
 }
