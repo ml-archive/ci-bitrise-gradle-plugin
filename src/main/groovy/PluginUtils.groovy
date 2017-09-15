@@ -23,7 +23,22 @@ class PluginUtils {
         return taskNames
     }
 
-    static List<String> getFilteredTaskNames(Project project){
+    static String getBranchName(Project project) {
+        def hashStdOut = new ByteArrayOutputStream()
+
+        try {
+            project.exec {
+                commandLine "git", "rev-parse", "--abbrev-ref", "HEAD"
+                standardOutput = hashStdOut
+            }
+        } catch (Exception ignored) {
+            //Do nothing
+        }
+
+        return hashStdOut.toString().trim()
+    }
+
+    static List<String> getFilteredTaskNames(Project project) {
         List<String> taskNames = new ArrayList<>()
 
         List<String> filterNames = getFilterNames(project)
@@ -49,7 +64,7 @@ class PluginUtils {
         return taskNames
     }
 
-    static List<String> getFilterNames(Project project){
+    static List<String> getFilterNames(Project project) {
         String flavorNames = project.bitrise.flavorFilter
 
         String[] filters = flavorNames.tokenize("|")

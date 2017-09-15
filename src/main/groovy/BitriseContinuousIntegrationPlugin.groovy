@@ -45,7 +45,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                 flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_STAGING, null)
                 flavor.ext.set("deploy", "")
         }
-
         //Task to generate our tasks
         project.task("generateCITasks") {
             generateFlavorTasks()
@@ -55,7 +54,8 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         createDeployAllTask()
         //Create our task to deploy only selected flavors
         createDeployFiltersTask()
-
+        //Create branch naming tasks
+        generateBranchNamerTask()
 
         if (this.project.bitrise.envManEnabled) {
             project.task("ciDebug") doLast {
@@ -73,16 +73,11 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         }
     }
 
-    void initializeEnvman() {
-        try {
-            project.exec {
-                workingDir BUILD_DIR
-                commandLine 'envman', 'init'
-            }
-        } catch (Exception exception) {
-        }
-    }
-
+    /**
+     * Returns an array of tasks which can either be all tasks of just the filtered tasks
+     * @param filtered Should this task only returned the filtered list of tasks or all of them (true = all tasks)
+     * @return List < Task >  Task List
+     */
     List<Task> getTasks(boolean filtered) {
         List<String> taskNames = filtered ? PluginUtils.getFilteredTaskNames(project) : PluginUtils.getTaskNames(project)
         List<Task> tasks = new ArrayList<>()
@@ -93,6 +88,9 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         return tasks
     }
 
+    /**
+     *  Generates the parent task for generate all builds
+     */
     void createDeployAllTask() {
         project.task("ciDeployAll") doLast {
             jsonArray = new JsonArray()
@@ -101,6 +99,9 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         } setGroup(GROUP_NAME)
     }
 
+    /**
+     *  Generates the parent task for generate all filtered builds
+     */
     void createDeployFiltersTask() {
         project.task("ciDeployFilters") doLast {
             jsonArray = new JsonArray()
@@ -108,6 +109,36 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
             return getTasks(true)
         } setGroup(GROUP_NAME)
     }
+
+    /**
+     * This adds a {versionName}-{branchName} to each build so we know which build is generate from which branch
+     * This most likely needs a better name
+     */
+    void generateBranchNamerTask() {
+        String branchName = PluginUtils.getBranchName(project)
+
+        project.android.applicationVariants.all {
+            variant ->
+                assert variant instanceof ApplicationVariant
+                println()
+                println("Branch Name: " + branchName)
+                println()
+
+                if (!branchName.contains("/")) {
+                    return
+                }
+
+                variant.checkManifest.doLast {
+                    String typeName = branchName.split("/")[1].toUpperCase()
+                    String variantName = variant.getVersionName()
+                    String newName = String.format("%s-%s", variantName, typeName)
+                    variant.mergedFlavor.versionName = newName
+                }
+        }
+    }
+    /**
+     * Generate the build task for each flavor
+     */
 
     void generateFlavorTasks() {
         //Generate the children tasks
@@ -128,6 +159,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                 boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
 
                 if (shouldCreateTask) {
+                    //Task to assemble the build
                     Task taskAssemble = project.tasks.findByName(tnAssemble)
 
                     //Create our validation Task (use to make sure our hockey ID is present)
@@ -138,7 +170,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                         println "Validating Hockey ID"
                         println()
                         println "Validated Hockey ID: " + HockeyValidator.validate(variant)
-                        // < This function validates the ID
                         println()
                     }
 
@@ -153,8 +184,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                     }
 
                     taskDeploy.setGroup(GROUP_NAME)
-
-                    //Setup task order
 
                     taskAssemble.shouldRunAfter taskValidate
                     taskDeploy.shouldRunAfter taskAssemble
@@ -246,14 +275,14 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
 
         saveFile(jsonArray)
         //Try to write our file to Envman
-        if(this.project.bitrise.envManEnabled) {
+        if (this.project.bitrise.envManEnabled) {
             try {
                 project.exec {
                     workingDir BUILD_DIR
                     commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
                     println "Wrote json to ENV VAR"
                 }
-            } catch (Exception exception) {
+            } catch (Exception ignored) {
                 println "Error unable to locate envman skipping step"
             }
         }
@@ -274,7 +303,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         BUILD_DIR = projectPath
     }
 
-    void saveFile(JsonArray array) {
+    static void saveFile(JsonArray array) {
         String fileName = "hockeybuilds.json"
         def hockeyFilePath = new File(BUILD_DIR, fileName).toString()
         println "hockeyFilePath: " + hockeyFilePath
