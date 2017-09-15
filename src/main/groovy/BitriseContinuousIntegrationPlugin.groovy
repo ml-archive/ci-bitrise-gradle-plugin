@@ -15,6 +15,12 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     public static final String GROUP_NAME = "ci"
     private static final String BUILD_DIR_ENV = "BITRISE_SOURCE_DIR"
     private static String BUILD_DIR = ""
+
+    private static String RN_HOTFIX = "Hotfix"
+    private static String RN_FEATURE = "Feature"
+    private static String RC_HOTFIX = "#F44336"
+    private static String RC_FEATURE = "#3F51B5"
+
     private static JsonArray jsonArray = new JsonArray()
     //Format for our task names (%s being the name of the task)
     Project project
@@ -64,12 +70,15 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                         workingDir BUILD_DIR
                         commandLine 'envman', 'print'
                     }
-                } catch (Exception exception) {
+                } catch (Exception ignored) {
                     //println "Error unable to locate envman skipping step"
                     //If we get an exception here its most likely because we don't have envman installed
                 }
             } setGroup(GROUP_NAME)
         }
+
+        //Apply the ribbon branch
+        applyBranchRibbonizer()
     }
 
     /**
@@ -291,6 +300,33 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
             }
         }
         return jsonObject
+    }
+
+    /**
+     * Applies a branch ribbon based on the branch name
+     */
+    void applyBranchRibbonizer() {
+        if (this.project.bitrise.branchMode) {
+            String branchName = PluginUtils.getBranchName(project)
+
+            if (branchName.contains("feat") || branchName.contains("hot")) {
+                if (project.hasProperty("ribbonizer")) {
+                    String ribbonColor = branchName.contains("feat") ? RC_FEATURE : RC_HOTFIX
+                    String ribbonName = branchName.contains("feat") ? RN_FEATURE : RN_HOTFIX
+                    project.ribbonizer {
+                        builder { variant, iconFile ->
+                            def filter = customColorRibbonFilter(variant, iconFile, ribbonColor)
+                            filter.label = ribbonName
+                            return filter
+                        }
+                    }
+                } else {
+                    println("Missing Ribbonizer, skipping ribbonization")
+                }
+            }
+        } else {
+            println("Branch mode disabled, skipping ribbonizer!")
+        }
     }
 
     void generateBuildDir() {
