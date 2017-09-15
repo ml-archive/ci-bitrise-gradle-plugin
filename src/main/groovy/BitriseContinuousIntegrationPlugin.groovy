@@ -55,7 +55,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         //Create our task to deploy only selected flavors
         createDeployFiltersTask()
         //Create branch naming tasks
-        generateBranchNamerTask()
+        generateBranchTasks()
 
         if (this.project.bitrise.envManEnabled) {
             project.task("ciDebug") doLast {
@@ -113,27 +113,32 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     /**
      * This adds a {versionName}-{branchName} to each build so we know which build is generate from which branch
      * This most likely needs a better name
+     * Note: Can be disabled via the branchMode variable
      */
-    void generateBranchNamerTask() {
-        String branchName = PluginUtils.getBranchName(project)
+    void generateBranchTasks() {
+        if (this.project.bitrise.branchMode) {
+            String branchName = PluginUtils.getBranchName(project)
 
-        project.android.applicationVariants.all {
-            variant ->
-                assert variant instanceof ApplicationVariant
-                println()
-                println("Branch Name: " + branchName)
-                println()
+            project.android.applicationVariants.all {
+                variant ->
+                    assert variant instanceof ApplicationVariant
+                    println()
+                    println("Branch Name: " + branchName)
+                    println()
 
-                if (!branchName.contains("/")) {
-                    return
-                }
+                    if (!branchName.contains("/")) {
+                        return
+                    }
 
-                variant.checkManifest.doLast {
-                    String typeName = branchName.split("/")[1].toUpperCase()
-                    String variantName = variant.getVersionName()
-                    String newName = String.format("%s-%s", variantName, typeName)
-                    variant.mergedFlavor.versionName = newName
-                }
+                    variant.checkManifest.doLast {
+                        String typeName = branchName.split("/")[1].toUpperCase()
+                        String variantName = variant.getVersionName()
+                        String newName = String.format("%s-%s", variantName, typeName)
+                        variant.mergedFlavor.versionName = newName
+                    }
+            }
+        } else {
+            println("Branch mode disabled, skipping task!")
         }
     }
     /**
