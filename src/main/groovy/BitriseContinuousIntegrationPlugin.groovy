@@ -19,7 +19,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     //Format for our task names (%s being the name of the task)
     Project project
 
-
     @Override
     void apply(Project project) {
         this.project = project

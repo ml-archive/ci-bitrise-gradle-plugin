@@ -8,10 +8,19 @@ Android Gradle plugin for Bitrise CI
 bitrise{
     defaultDeployMode="release|staging"
     flavorFilter = "firstSkin"
+    envManEnabled = false
+    branchMode = true
 }
 ```
 `defaultDeployMode` Which modes should be deployed if no mode is present in the flavor (Optional)  
-`flavorFilter` Can specifiy which flavor should be deployed (Optional)
+`flavorFilter` Can specify which flavor should be deployed (Optional)  
+`envManEnabled` Should the plugin use EnvMan by default (default = false)  
+`branchMode` Should the app use Branch Mode (default = true)  
+
+**Branch mode**  
+Branch mode allows the plugin to check which branch the app is currently being built from and apply that to the version name for example if
+the branch was being built on `feature/ARandomFeature` the versionName would reflect that `1.0.0-ARANDOMFEATURE`
+
 
 ## Android Flavor Config
 
