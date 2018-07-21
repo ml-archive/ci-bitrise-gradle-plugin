@@ -141,8 +141,10 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                     variant.checkManifest.doLast {
                         String typeName = branchName.split("/")[1].toUpperCase()
                         String variantName = variant.getVersionName()
-                        String newName = String.format("%s-%s", variantName, typeName)
-                        variant.mergedFlavor.versionName = newName
+                        String newVersionName = String.format("%s-%s", variantName, typeName)
+                        variant.outputs.all { output ->
+                            output.versionNameOverride = newVersionName
+                        }
                     }
             }
         } else {

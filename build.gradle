@@ -16,7 +16,7 @@ apply plugin: 'maven-publish'
 apply plugin: 'io.codearte.nexus-staging'
 
 group = 'dk.nodes.ci'
-version = '0.93'
+version = '1.0'
 archivesBaseName = 'bitrise'
 
 apply from: 'maven-push.gradle'
