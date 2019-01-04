@@ -2,6 +2,7 @@ import com.android.build.gradle.api.ApplicationVariant
 import org.gradle.api.GradleException
 
 class HockeyValidator {
+    public static final String HOCKEY_ID_TYPE_DEVELOPMENT = "hockeyAppIdDevelopment"
     public static final String HOCKEY_ID_TYPE_STAGING = "hockeyAppIdStaging"
     public static final String HOCKEY_ID_TYPE_RELEASE = "hockeyAppId"
     public static final String HOCKEY_TYPE_RELEASE = "release"
@@ -12,13 +13,16 @@ class HockeyValidator {
     static String validate(ApplicationVariant variant) {
         String hockeyId = null
 
-        boolean isStagingOrDebug = 
-            PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_STAGING) || 
-            PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_DEBUG)
-
+        boolean isDebug = PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_DEBUG)
+        boolean isStaging = PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_STAGING)
         boolean isRelease = PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_RELEASE)
 
-        if (isStagingOrDebug) {
+        if (isDebug) {
+            hockeyId = variant.productFlavors[0].ext.get(HOCKEY_ID_TYPE_DEVELOPMENT) ?: variant.productFlavors[0].ext.get(HOCKEY_ID_TYPE_STAGING)
+            checkHockeyID(hockeyId, HOCKEY_ID_TYPE_DEVELOPMENT)
+        }
+
+        if (isStaging) {
             hockeyId = variant.productFlavors[0].ext.get(HOCKEY_ID_TYPE_STAGING) ?: variant.productFlavors[0].ext.get(HOCKEY_ID_TYPE_RELEASE)
             checkHockeyID(hockeyId, HOCKEY_ID_TYPE_STAGING)
         }
