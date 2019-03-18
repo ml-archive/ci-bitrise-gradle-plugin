@@ -3,12 +3,14 @@ import com.android.build.gradle.LibraryPlugin
 import com.android.build.gradle.api.ApplicationVariant
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import org.gradle.api.Action
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
 
 class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
-    public static final String FORMAT_TASK_NAME = "ci%s" //Format for our task names (%s being the name of the task)
+    public static final String FORMAT_TASK_NAME = "ci%s"
+    //Format for our task names (%s being the name of the task)
     public static final String FORMAT_VALIDATE_TASK_NAME = "ci%sValidate"
     public static final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
     public static final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
@@ -146,11 +148,27 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                             output.versionNameOverride = newVersionName
                         }
                     }
+
+                    variant.checkManifestProvider.configure(new Action<Task>() {
+                        void execute(Task task) {
+                            task.doLast(new Action<Task>() {
+                                void execute(Task task2) {
+                                    String typeName = branchName.split("/")[1].toUpperCase()
+                                    String variantName = variant.getVersionName()
+                                    String newVersionName = String.format("%s-%s", variantName, typeName)
+                                    variant.outputs.all { output ->
+                                        output.versionNameOverride = newVersionName
+                                    }
+                                }
+                            })
+                        }
+                    })
             }
         } else {
             println("Branch mode disabled, skipping task!")
         }
     }
+
     /**
      * Generate the build task for each flavor
      */
