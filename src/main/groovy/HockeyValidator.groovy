@@ -13,6 +13,11 @@ class HockeyValidator {
     static String validate(ApplicationVariant variant) {
         String hockeyId = null
 
+        variant.getProductFlavors().each { flavor ->
+            flavor
+
+        }
+
         boolean isDebug = PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_DEBUG)
         boolean isStaging = PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_STAGING)
         boolean isRelease = PluginUtils.containsIgnoreCase(variant.name, HOCKEY_TYPE_RELEASE)
