@@ -296,7 +296,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
             try {
                 project.exec {
                     workingDir BUILD_DIR
-                    commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
+                    commandLine 'envman', 'add', '--key', 'APPCENTERBUILDSJSON', '--value', jsonArray.toString()
                     println "Wrote json to ENV VAR"
                 }
             } catch (Exception ignored) {
@@ -363,7 +363,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     }
 
     static void saveFile(JsonArray array) {
-        String fileName = "hockeybuilds.json"
+        String fileName = "appcenterbuilds.json"
         def hockeyFilePath = new File(BUILD_DIR, fileName).toString()
         println "hockeyFilePath: " + hockeyFilePath
         def stringsFile = new File(hockeyFilePath)

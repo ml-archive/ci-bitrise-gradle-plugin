@@ -1,6 +1,5 @@
-//apply plugin: 'signing'
+apply plugin: 'signing'
 apply plugin: 'maven'
-apply plugin: 'maven-publish'
 
 
 def _name = 'Nodes CI gradle plugin for Bitrise'
@@ -10,45 +9,18 @@ def _description = 'Nodes CI gradle plugin for Bitrise'
 def _ossrhUsername = System.getenv('NEXUS_USERNAME')
 def _ossrhPassword = System.getenv('NEXUS_PASSWORD')
 
-//allprojects { ext."signing.keyId" = System.getenv('keyId') }
-//allprojects { ext."signing.secretKeyRingFile" = System.getenv('secretKeyRingFile') }
-//allprojects { ext."signing.password" = System.getenv('password') }
+allprojects { ext."signing.keyId" = System.getenv('keyId') }
+allprojects { ext."signing.secretKeyRingFile" = System.getenv('secretKeyRingFile') }
+allprojects { ext."signing.password" = System.getenv('password') }
 
-/*signing {
+signing {
     required { gradle.taskGraph.hasTask("uploadArchives") }
     sign configurations.archives
-}*/
+}
 
 jar {
     manifest {
         attributes 'Implementation-Title': _name, 'Implementation-Version': version
-    }
-}
-
-/*publishing {
-    publications {
-        aarDebug(MavenPublication) {
-            groupId "coom.nodes"
-            artifactId "bitrise"
-            version "1.0.0"
-            artifact("$buildDir/outputs/aar/bitrise-debug.aar")
-            // Add javadocs and sources artifact
-            // Add/Exclude project dependencies via pom.withXml
-        }
-    }
-}*/
-
-publishing {
-    repositories {
-        maven {
-            url "file:///Users/dtunctuncer/.m2/repository/"
-        }
-    }
-    publications {
-        testing(MavenPublication) {
-            from components.java
-            artifact sourcesJar
-        }
     }
 }
 
@@ -75,12 +47,16 @@ uploadArchives {
     repositories {
         mavenDeployer {
 
-//            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
-            repository(url: "$buildDir/m2/releases")
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: _ossrhUsername, password: _ossrhPassword)
+            }
 
-            snapshotRepository(url: "$buildDir/m2/snapshots")
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: _ossrhUsername, password: _ossrhPassword)
+            }
 
-            /*pom.project {
+            pom.project {
                 name _name
                 packaging 'jar'
                 artifactId archivesBaseName
@@ -112,8 +88,7 @@ uploadArchives {
                     system 'GitHub issues'
                     url 'https://github.com/nodes-android/ci-bitrise-gradle-plugin/issues'
                 }
-            }*/
+            }
         }
-
     }
 }
