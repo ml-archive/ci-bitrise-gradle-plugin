@@ -13,7 +13,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     public static final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
     public static final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
     public static final String GROUP_NAME = "ci"
-    public static final String DEFAULT_OWNER_NAME = "Casper-Rasmussen-Organization"
+    public static final String DEFAULT_OWNER_NAME = "NodesAgency"
     public static final String APPCENTER_NAME = "appCenter"
 
     private static final String BUILD_DIR_ENV = "BITRISE_SOURCE_DIR"
