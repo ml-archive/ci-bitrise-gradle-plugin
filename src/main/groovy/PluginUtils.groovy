@@ -9,13 +9,10 @@ class PluginUtils {
         for (ApplicationVariant variant : project.android.applicationVariants) {
             String variantName = capFirstLetter(variant.name)
 
-            String[] deploymentModes = getDeploymentModes(project, variant)
-
-            boolean shouldCreateTask = arrayContainsString(deploymentModes, variant.name)
 
             String taskName = String.format(BitriseContinuousIntegrationPlugin.FORMAT_TASK_NAME, variantName)
 
-            if (shouldCreateTask) {
+            if (shouldCreateTask("release", variantName)) {
                 taskNames.add(taskName)
             }
         }
@@ -46,9 +43,6 @@ class PluginUtils {
         for (ApplicationVariant variant : project.android.applicationVariants) {
             String variantName = capFirstLetter(variant.name)
 
-            String[] deploymentModes = getDeploymentModes(project, variant)
-
-            boolean shouldCreateTask = arrayContainsString(deploymentModes, variant.name)
 
             //If our filter list size is 0 then we should always return true because that means no filters :)
 
@@ -56,7 +50,7 @@ class PluginUtils {
 
             String taskName = String.format(BitriseContinuousIntegrationPlugin.FORMAT_TASK_NAME, variantName)
 
-            if (shouldCreateTask && isInFilter) {
+            if (isInFilter && shouldCreateTask("release", variantName)) {
                 taskNames.add(taskName)
             }
         }
@@ -149,5 +143,21 @@ class PluginUtils {
 
     static String capFirstLetter(final String line) {
         return Character.toUpperCase(line.charAt(0)).toString() + line.substring(1)
+    }
+
+    static boolean is2Dimension(ApplicationVariant variant) {
+        def extension = variant.productFlavors[0].extensions.findByName("appCenter")
+        if (extension.development.length() != 0) {
+            return true
+        } else if (extension.staging.length() != 0) {
+            return true
+        } else if (extension.production.length() != 0) {
+            return true
+        }
+        return false
+    }
+
+    static boolean shouldCreateTask(String mode, String variantName) {
+        return variantName.toLowerCase().contains(mode.toLowerCase())
     }
 }

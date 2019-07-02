@@ -13,6 +13,9 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     public static final String FORMAT_ASSEMBLE_TASK_NAME = "assemble%s"
     public static final String FORMAT_DEPLOY_TASK_NAME = "ci%sDeploy"
     public static final String GROUP_NAME = "ci"
+    public static final String DEFAULT_OWNER_NAME = "NodesAgency"
+    public static final String APPCENTER_NAME = "appCenter"
+
     private static final String BUILD_DIR_ENV = "BITRISE_SOURCE_DIR"
     private static String BUILD_DIR = ""
 
@@ -44,11 +47,14 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         project.extensions.create("bitrise", BitriseExtension)
 
         //Go through each flavor and add extensions
+        project.android.productFlavors.whenObjectAdded { flavor ->
+            flavor.extensions.create("appCenter", AppCenterExtension)
+        }
         project.android.productFlavors.all {
             flavor ->
                 flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_RELEASE, null)
                 flavor.ext.set(HockeyValidator.HOCKEY_ID_TYPE_STAGING, null)
-                flavor.ext.set("deploy", "")
+                flavor.ext.set(APPCENTER_NAME, "")
         }
         //Task to generate our tasks
         project.task("generateCITasks") {
@@ -103,7 +109,9 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         project.task("ciDeployAll") doLast {
             jsonArray = new JsonArray()
         } dependsOn {
-            return getTasks(false)
+            def tasks = getTasks(false)
+            println(tasks.toString())
+            return tasks
         } setGroup(GROUP_NAME)
     }
 
@@ -162,30 +170,38 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
             variant ->
                 assert variant instanceof ApplicationVariant
 
-                String variantName = PluginUtils.capFirstLetter(variant.name)
+                if (PluginUtils.shouldCreateTask("release", variant.name)) {
+                    String variantName = PluginUtils.capFirstLetter(variant.name)
 
-                String tnAssemble = String.format(FORMAT_ASSEMBLE_TASK_NAME, variantName)
-                String tnValidate = String.format(FORMAT_VALIDATE_TASK_NAME, variantName)
-                String tnDeploy = String.format(FORMAT_DEPLOY_TASK_NAME, variantName)
-                String tnParent = String.format(FORMAT_TASK_NAME, variantName)
+                    String tnAssemble = String.format(FORMAT_ASSEMBLE_TASK_NAME, variantName)
+                    String tnValidate = String.format(FORMAT_VALIDATE_TASK_NAME, variantName)
+                    String tnDeploy = String.format(FORMAT_DEPLOY_TASK_NAME, variantName)
+                    String tnParent = String.format(FORMAT_TASK_NAME, variantName)
 
-                String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
-
-                boolean shouldCreateTask = PluginUtils.arrayContainsString(deploymentModes, variant.name)
-
-                if (shouldCreateTask) {
                     //Task to assemble the build
                     Task taskAssemble = project.tasks.findByName(tnAssemble)
 
-                    //Create our validation Task (use to make sure our hockey ID is present)
+                    //Create our validation Task (use to make sure our name is present)
                     Task taskValidate = project.task(tnValidate)
 
+                    println(variantName)
+
                     taskValidate.doLast {
-                        println()
-                        println "Validating Hockey ID"
-                        println()
-                        println "Validated Hockey ID: " + HockeyValidator.validate(variant)
-                        println()
+                        if (!PluginUtils.is2Dimension(variant)) {
+                            println()
+                            println "Validating App Name"
+                            println()
+                            println "Validated App Name: " + AppCenterValidator.validate(variant)
+                            println()
+                        } else {
+                            println()
+                            println "Validating 2 dimension App Name"
+                            println()
+                            println "Validated 2 dimension App Name: " + AppCenterValidator.validate2Dimension(variant)
+                            println()
+
+                        }
+
                     }
 
                     taskValidate.setGroup(GROUP_NAME)
@@ -216,7 +232,6 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                     }
 
                     taskParent.setGroup(GROUP_NAME)
-
                 }
         }
 
@@ -235,7 +250,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
                             if (task.name.contains(GROUP_NAME) &&
                                     task.name.contains(flavorName) &&
                                     !task.name.equalsIgnoreCase(taskName)) {
-                                println task.name
+                                println("PARENT TASK NAME : " + task.name)
                                 return task
                             }
                     }
@@ -245,48 +260,35 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
         }
     }
 
-    JsonObject singleDeploy(Project project, ApplicationVariant variant) {
-        String apk = null
-        String hockeyId
-        String appId = variant.applicationId
-        String mappingFile = variant.mappingFile
-
-        String[] deploymentModes = PluginUtils.getDeploymentModes(project, variant)
-
-        boolean shouldDeploy = PluginUtils.arrayContainsString(deploymentModes, variant.name)
-        String deployMode = PluginUtils.searchArray(deploymentModes, variant.name)
-
-        //If we aren't deploying then just abort
-        if (!shouldDeploy) {
+    void singleDeploy(Project project, ApplicationVariant variant) {
+        if (!PluginUtils.shouldCreateTask("release", variant.name)) {
             return
         }
 
-        //Pull whatever value we need
-        hockeyId = HockeyValidator.validate(variant)
+        String apk = null
+        String appName
+        String appId = variant.applicationId
+        String ownerName = variant.productFlavors[0].extensions.findByName("appCenter").ownerName
 
         variant.outputs.each {
             output ->
                 apk = output.outputFile
         }
 
-        println()
-        println('')
-        println('apk: ' + apk)
-        println('hockeyId: ' + hockeyId)
-        println('appId: ' + appId)
-        println('mappingFile: ' + mappingFile)
-        println('')
-        println()
 
-        JsonObject jsonObject = new JsonObject()
+        //Pull whatever value we need
+        if (AppCenterValidator.is2Dimension(variant)) {
+            Map<String, String> appNames = AppCenterValidator.validate2Dimension(variant)
+            appNames.each { app ->
+                if (variant.name.toLowerCase().contains(app.key.toLowerCase())) {
+                    jsonArray.add(createJsonObject(apk, app.value, appId, ownerName))
+                }
+            }
+        } else {
+            appName = AppCenterValidator.validate(variant)
+            jsonArray.add(createJsonObject(apk, appName, appId, ownerName))
+        }
 
-        jsonObject.addProperty("build", apk)
-        jsonObject.addProperty("hockeyId", hockeyId)
-        jsonObject.addProperty("appId", appId)
-        jsonObject.addProperty("mappingFile", mappingFile.toString())
-        jsonObject.addProperty("deploy", deployMode)
-
-        jsonArray.add(jsonObject)
 
         saveFile(jsonArray)
         //Try to write our file to Envman
@@ -294,19 +296,34 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
             try {
                 project.exec {
                     workingDir BUILD_DIR
-                    commandLine 'envman', 'add', '--key', 'HOCKEYBUILDSJSON', '--value', jsonArray.toString()
+                    commandLine 'envman', 'add', '--key', 'APPCENTERBUILDSJSON', '--value', jsonArray.toString()
                     println "Wrote json to ENV VAR"
                 }
             } catch (Exception ignored) {
                 println "Error unable to locate envman skipping step"
             }
         }
-        return jsonObject
     }
 
-    /**
-     * Applies a branch ribbon based on the branch name
-     */
+    static JsonObject createJsonObject(String apk, String appName, String appId, String ownerName) {
+        JsonObject jsonObject = new JsonObject()
+        println()
+        println('')
+        println('apk: ' + apk)
+        println('appName: ' + appName)
+        println('appId: ' + appId)
+        println('ownerName: ' + ownerName)
+        println()
+
+        jsonObject.addProperty("build", apk)
+        jsonObject.addProperty("appName", appName)
+        jsonObject.addProperty("ownerName", ownerName)
+
+        return jsonObject
+    }
+/**
+ * Applies a branch ribbon based on the branch name
+ */
     void applyBranchRibbonizer() {
         if (this.project.bitrise.branchMode) {
             String branchName = PluginUtils.getBranchName(project)
@@ -346,7 +363,7 @@ class BitriseContinuousIntegrationPlugin implements Plugin<Project> {
     }
 
     static void saveFile(JsonArray array) {
-        String fileName = "hockeybuilds.json"
+        String fileName = "appcenterbuilds.json"
         def hockeyFilePath = new File(BUILD_DIR, fileName).toString()
         println "hockeyFilePath: " + hockeyFilePath
         def stringsFile = new File(hockeyFilePath)

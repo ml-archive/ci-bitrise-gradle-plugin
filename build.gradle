@@ -1,5 +1,6 @@
 buildscript {
     repositories {
+        mavenLocal()
         jcenter()
     }
     dependencies {
@@ -16,7 +17,7 @@ apply plugin: 'maven-publish'
 apply plugin: 'io.codearte.nexus-staging'
 
 group = 'dk.nodes.ci'
-version = '1.2'
+version = '2.0-SNAPSHOT'
 archivesBaseName = 'bitrise'
 
 apply from: 'maven-push.gradle'
@@ -28,8 +29,11 @@ nexusStaging {
 sourceCompatibility = 1.8
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
+
+allprojects { repositories { mavenLocal() } }
 
 dependencies {
     compile gradleApi()
